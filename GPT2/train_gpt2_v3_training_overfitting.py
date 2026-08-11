@@ -166,7 +166,7 @@ class GPT(nn.Module):
 # attempt to autodetect device
 device = "cpu"
 if torch.cuda.is_available():
-    device = "cuda"
+   device = "cuda:0" # Added :0 for 1660 ti
 elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
     device = "mps"
 print(f"using device: {device}")
