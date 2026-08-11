@@ -211,7 +211,7 @@ print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-# import time
+import time
 
 for iter in range(max_iters):
 
@@ -221,7 +221,9 @@ for iter in range(max_iters):
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
     # start timer
-    # t0 = time.time()
+    if device.startswith('cuda'):
+        torch.cuda.synchronize()
+    t0 = time.time()
 
     # sample a batch of data
     xb, yb = get_batch('train')
@@ -233,11 +235,11 @@ for iter in range(max_iters):
     optimizer.step()
 
     # This calculates around 0.5 sec per iteration so about 41 min for 5000 iterations
-    # if device.startswith('cuda'):
-    #     torch.cuda.synchronize()
-    # t1 = time.time()
-    # dt = (t1 - t0) #
-    # print(f"step {iter}: train loss {loss.item():.4f} | device time: {dt:.2f}s")
+    if device.startswith('cuda'):
+        torch.cuda.synchronize()
+    t1 = time.time()
+    dt = (t1 - t0) * 1000 # time taken in milliseconds
+    print(f"step {iter}: device time: {dt:.2f}ms")
 
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
