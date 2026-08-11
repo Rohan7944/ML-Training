@@ -8,7 +8,7 @@ block_size = 8 # what is the maximum context length for predictions?
 max_iters = 5000
 eval_interval = 500
 learning_rate = 1e-3
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
 n_embd = 32
 # ------------
@@ -154,7 +154,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 for iter in range(max_iters):
 
     # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0:
+    if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
