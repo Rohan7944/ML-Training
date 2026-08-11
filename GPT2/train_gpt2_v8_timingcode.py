@@ -231,7 +231,7 @@ elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
 print(f"using device: {device}")
 
 # Config as per 1660ti
-train_loader = DataLoaderLite(B=4, T=512) # 4 examples per batch, sequence length 512
+train_loader = DataLoaderLite(B=1, T=1024) # 4 examples per batch, sequence length 512
 
 # ---------------------------------------------------------------------------------------------------
 # For reproducibility
