@@ -218,6 +218,7 @@ t2 = time.time()
 
 for iter in range(max_iters):
 
+    # Remove iter % eval_interval == 0 condition when running to save time
     # every once in a while evaluate the loss on train and val sets
     if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
