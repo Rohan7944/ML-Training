@@ -8,7 +8,7 @@ block_size = 256 # what is the maximum context length for predictions?
 max_iters = 5000
 eval_interval = 500
 learning_rate = 3e-4
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu' # cuda:0 is the first GPU
 eval_iters = 200
 n_embd = 384
 n_head = 6 # 384/6 = 64 dimensional head
