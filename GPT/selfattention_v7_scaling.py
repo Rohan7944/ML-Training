@@ -5,7 +5,7 @@ from torch.nn import functional as F
 # hyperparameters
 batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-max_iters = 5000
+max_iters = 3000
 eval_interval = 500
 learning_rate = 3e-4
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu' # cuda:0 is the first GPU
@@ -213,6 +213,9 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
 import time
 
+# start timer (total time)
+t2 = time.time()
+
 for iter in range(max_iters):
 
     # every once in a while evaluate the loss on train and val sets
@@ -221,8 +224,6 @@ for iter in range(max_iters):
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
     # start timer
-    if device.startswith('cuda'):
-        torch.cuda.synchronize()
     t0 = time.time()
 
     # sample a batch of data
@@ -239,7 +240,14 @@ for iter in range(max_iters):
         torch.cuda.synchronize()
     t1 = time.time()
     dt = (t1 - t0) * 1000 # time taken in milliseconds
-    print(f"step {iter}: device time: {dt:.2f}ms")
+    print(f"step {iter}: Iteration time: {dt:.2f}ms | Total time: {(t1-t2):.2f}s")
+
+# end timer (total timer)
+if device.startswith('cuda'):
+    torch.cuda.synchronize()
+t3 = time.time()
+dt1 = (t3 - t2) # time taken in seconds
+print(f"Total time: {dt1:.2f}s")
 
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
