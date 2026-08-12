@@ -233,6 +233,9 @@ print(f"using device: {device}")
 # Config as per 1660ti, use 2^x for values of B otherwise it runs inefficiently
 train_loader = DataLoaderLite(B=1, T=1024) # 1 example per batch, sequence length 1024
 
+# enable TF32, works only with TF32 supported GPU architectures
+torch.set_float32_matmul_precision('high')
+
 # ---------------------------------------------------------------------------------------------------
 # For reproducibility
 torch.manual_seed(1337) # set the random seed for reproducibility
