@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-import math
+# import math
 
 class CausalSelfAttention(nn.Module):
 
@@ -32,10 +32,13 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         # attention (materializes the large (T,T) matrix for all the queries and keys)
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
-        att = F.softmax(att, dim=-1)
-        y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+        # Flash attention ---------------------------------------------------
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        # att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        # att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
+        # att = F.softmax(att, dim=-1)
+        # y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+        # -------------------------------------------------------------------
         y = y.transpose(1,2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
         # output projection
         y = self.c_proj(y)
@@ -245,13 +248,14 @@ if torch.cuda.is_available():
 # --------------------------------------------------------------------------------------------------------
 # get the logits
 # model = GPT.from_pretrained('gpt2') # initialize from gpt2 model weights from huggingface
-model = GPT(GPTConfig()) # initialize a new model with the same config as GPT-2 (random model)
+model = GPT(GPTConfig(vocab_size=50304)) # initialize a new model with the same config as GPT-2 (random model)
 model.to(device)
+model = torch.compile(model) # compile the model for faster training
 
 # ---------------------------------------------------------------------------------------------------
 # optimization
-
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4) # alternative to SGD
+# alternative to SGD
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.999), eps=1e-8)
 for i in range(50):
     t0 = time.time()
     x, y = train_loader.next_batch()
@@ -260,9 +264,12 @@ for i in range(50):
     with torch.autocast(device_type=device, dtype=torch.bfloat16): # enable bf16 for faster training
         logits, loss = model(x, y)
     loss.backward() # adds to gradient for each parameter based on the loss
+    # clip the gradient to prevent exploding gradients
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimizer.step() # update the parameters and decrease the loss
     torch.cuda.synchronize() # wait for the GPU to finish before measuring time
     t1 = time.time()
     dt = (t1 - t0)
-    tokens_per_sec = (train_loader.B * train_loader.T) / dt
-    print(f"step {i}: loss {loss.item():.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")
+    tokens_processed = train_loader.B * train_loader.T
+    tokens_per_sec = tokens_processed / dt 
+    print(f"step {i}: loss {loss.item():.4f}, norm {norm:.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")

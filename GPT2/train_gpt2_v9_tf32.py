@@ -262,6 +262,6 @@ for i in range(50):
     optimizer.step() # update the parameters and decrease the loss
     torch.cuda.synchronize() # wait for the GPU to finish before measuring time
     t1 = time.time()
-    dt = (t1 - t0) * 1000 # convert to milliseconds
-    tokens_per_sec = (train_loader.B * train_loader.T) / (t1 - t0)
+    dt = (t1 - t0)
+    tokens_per_sec = (train_loader.B * train_loader.T) / dt
     print(f"step {i}: loss {loss.item():.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")
