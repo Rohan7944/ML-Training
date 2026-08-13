@@ -266,4 +266,5 @@ for i in range(50):
     t1 = time.time()
     dt = (t1 - t0)
     tokens_per_sec = (train_loader.B * train_loader.T) / dt
+    dt *= 1000 # Convert to milliseconds
     print(f"step {i}: loss {loss.item():.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")
