@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-# import math
+import math
 
 class CausalSelfAttention(nn.Module):
 
@@ -253,10 +253,30 @@ model.to(device)
 model = torch.compile(model) # compile the model for faster training
 
 # ---------------------------------------------------------------------------------------------------
+# Learning rate scheduler - Cosine decay learning schedule with warmup
+
+max_lr = 6e-4 # maximum learning rate
+min_lr = max_lr * 0.1 # minimum learning rate (10% of max_lr)
+warmup_steps = 10
+max_steps = 50
+def get_lr(it):
+    # 1. Linear warmup for warmup_iter steps
+    if it < warmup_steps:
+        return max_lr * (it + 1) / warmup_steps
+    # 2. If it > lr_decay_iters, return min learning rate
+    if it > max_steps:
+        return min_lr
+    # 3. In between, use cosine decay down to min learning rate
+    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff starts at 1 and ends at 0
+    return min_lr + coeff * (max_lr - min_lr) # scale the learning rate
+
+# ---------------------------------------------------------------------------------------------------
 # optimization
 # alternative to SGD
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
-for i in range(50):
+for step in range(max_steps):
     t0 = time.time()
     x, y = train_loader.next_batch()
     x, y = x.to(device), y.to(device)
@@ -266,6 +286,10 @@ for i in range(50):
     loss.backward() # adds to gradient for each parameter based on the loss
     # clip the gradient to prevent exploding gradients
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    # determine and set the learning rate for this iteration
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
     optimizer.step() # update the parameters and decrease the loss
     torch.cuda.synchronize() # wait for the GPU to finish before measuring time
     t1 = time.time()
