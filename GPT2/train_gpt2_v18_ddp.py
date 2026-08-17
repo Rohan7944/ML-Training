@@ -260,6 +260,7 @@ class DataLoaderLite:
 # run the training loop
 from torch.distributed import init_process_group, destroy_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
 
 # set up a DDP(distributed data parallel)
 # torchrun command sets the env variables RANK, LOCAL_RANK, WORLD_SIZE
@@ -321,6 +322,7 @@ model = torch.compile(model) # compile the model for faster training
 if ddp:
     # wrap the model with DDP container
     model = DDP(model, device_ids=[ddp_local_rank])
+raw_model = model.module if ddp else model # unwrap the DDP container to get the raw model
 
 # ---------------------------------------------------------------------------------------------------
 # Learning rate scheduler - Cosine decay learning schedule with warmup
@@ -346,7 +348,8 @@ def get_lr(it):
 # optimization
 # alternative to SGD
 # optimizer = torch.optim.AdamW(model.parameters(), lr=6e-4, betas=(0.9, 0.95), eps=1e-8)
-optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device)
+# optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device)
+optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device)
 
 for step in range(max_steps):
     t0 = time.time()
@@ -363,7 +366,12 @@ for step in range(max_steps):
         # instead of a SUM we want MEAN. Scale the loss here so it comes out of 
         loss = loss / grad_accum_steps # scale the loss to account for gradient accumulation
         loss_accum += loss.detach()
+        if ddp:
+            # only sync gradients on the last micro-step
+            model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
         loss.backward() # adds to gradient for each parameter based on the loss
+    if ddp:
+        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG) 
     # clip the gradient to prevent exploding gradients
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     # determine and set the learning rate for this iteration
@@ -374,7 +382,11 @@ for step in range(max_steps):
     torch.cuda.synchronize() # wait for the GPU to finish before measuring time
     t1 = time.time()
     dt = (t1 - t0)
-    tokens_processed = train_loader.B * train_loader.T * grad_accum_steps
+    tokens_processed = train_loader.B * train_loader.T * grad_accum_steps * ddp_world_size
     tokens_per_sec = tokens_processed / dt 
     dt *= 1000 # Convert to milliseconds
-    print(f"step {step:4d} | loss {loss_accum.item():.6f} | lr {lr:.4e} | norm {norm:.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")
+    if master_process:
+        print(f"step {step:4d} | loss {loss_accum.item():.6f} | lr {lr:.4e} | norm {norm:.4f}, time {dt:.2f} ms, tokens/sec {tokens_per_sec:.2f}")
+
+if ddp:
+    destroy_process_group() # clean up the distributed backend
