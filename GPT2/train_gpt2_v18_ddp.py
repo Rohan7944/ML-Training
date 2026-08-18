@@ -312,7 +312,7 @@ if master_process:
 
 # Config as per 1660ti, use 2^x for values of B otherwise it runs inefficiently
 # train_loader = DataLoaderLite(B=1, T=1024) # 1 example per batch, sequence length 1024
-train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, world_size=ddp_world_size) # 1 example per batch, sequence length 1024
+train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size) # 1 example per batch, sequence length 1024
 
 # enable TF32, works only with TF32 supported GPU architectures
 torch.set_float32_matmul_precision('high')
