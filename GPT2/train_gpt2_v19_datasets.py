@@ -219,8 +219,7 @@ class GPT(nn.Module):
 
 # -----------------------------------------------------------------------------------------------
 # get a single data batch
-import tiktoken
-
+# import tiktoken
 import numpy as np
 
 def load_tokens(filename):
@@ -354,10 +353,12 @@ raw_model = model.module if ddp else model # unwrap the DDP container to get the
 # ---------------------------------------------------------------------------------------------------
 # Learning rate scheduler - Cosine decay learning schedule with warmup
 
+# Exact hyperparamters of GPT-3 
 max_lr = 6e-4 # maximum learning rate
 min_lr = max_lr * 0.1 # minimum learning rate (10% of max_lr)
-warmup_steps = 10 # 715
-max_steps = 50 # 19073
+warmup_steps = 715  # GPT-3 paper uses 375 million tokens so 375e6 / 2^^19 = 715 approx steps
+max_steps = 19073 # 10e9(unique tokens) / 2^^19(total batch size) = 19073 approx steps
+
 def get_lr(it):
     # 1. Linear warmup for warmup_iter steps
     if it < warmup_steps:
