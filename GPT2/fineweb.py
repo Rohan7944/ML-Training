@@ -34,6 +34,7 @@ def tokenize(doc):
     tokens = [eot] # the special <|endoftext|> token delimits all documents
     tokens.extend(enc.encode_ordinary(doc["text"]))
     tokens_np = np.array(tokens)
+    # GPT 2 has a vocab size of 50257, so we can safely store all tokens in uint16 (max value 65535)
     assert (0 <= tokens_np).all() and (tokens_np < 2**16).all(), "token dictionary too large for uint16"
     tokens_np_uint16 = tokens_np.astype(np.uint16)
     return tokens_np_uint16
